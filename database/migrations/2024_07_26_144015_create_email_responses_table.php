@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('batch_id')->nullable();
             $table->string('email',96)->nullable();
-            $table->boolean('status')->nullable();
+            $table->string('status')->nullable();
             $table->string('user',36)->nullable();
             $table->string('time',36)->nullable();
             $table->string('domain',96)->nullable();

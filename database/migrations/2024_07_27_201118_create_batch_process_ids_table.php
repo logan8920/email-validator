@@ -13,7 +13,10 @@ return new class extends Migration
     {
         Schema::create('batch_process_ids', function (Blueprint $table) {
             $table->id();
-            $table->text('job_ids')->nullable();
+            $table->string('file_name',256)->nullable();
+            $table->unsignedInteger('total_jobs')->nullable();
+            $table->unsignedInteger('job_completed')->default(0)->nullable();
+            $table->enum('status',[0,1,2])->default(0)->comment('0=>pending,1=>completed,2=>failed');
             $table->timestamps();
         });
     }

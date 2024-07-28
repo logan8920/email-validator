@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use Ramsey\Uuid\Uuid;
+use Illuminate\Support\Facades\Artisan;
 
 class EmailBatchValidator implements ShouldQueue 
 {
@@ -38,8 +39,8 @@ class EmailBatchValidator implements ShouldQueue
     {
 
         Log::info('Job started', ['jobId' => $this->jobId, 'time' => now(),'email' => count($this->data['emails'])]);
-       /* $batch_process = batch_process_id::whereId($this->batch_id)->first();
-        $jobids = $batch_process->job_ids ? json_decode($batch_process->job_ids) : [];
+        $batch_process = batch_process_id::whereId($this->batch_id->id)->first();
+        /* $jobids = $batch_process->job_ids ? json_decode($batch_process->job_ids) : [];
         $jobids[] = $this->jobId;
         $batch_process->update(['job_ids'=>json_encode($jobids)]);*/
         $client = new Client();
@@ -68,6 +69,19 @@ class EmailBatchValidator implements ShouldQueue
             //dd($body['data']);
             EmailResponse::insert($body['data']);
             Log::info('Job completed successfully', ['jobId' => $this->jobId, 'time' => now()]);
+
+            $batch_process->update([
+                'job_completed' => ($batch_process->job_completed + 1)
+            ]);
+
+           
+           // dd([$batch_process->total_jobs,$batch_process->job_completed]);
+            if ($batch_process->total_jobs === $batch_process->job_completed) :
+                //dd('inside');
+                $batch_process->update([
+                    'status' => '1'
+                ]);
+            endif;
         } catch (RequestException $e) {
             if ($e->hasResponse()) {
                 $error = $e->getResponse()->getBody()->getContents();
@@ -75,6 +89,12 @@ class EmailBatchValidator implements ShouldQueue
             } else {
                 Log::error('Job failed', ['jobId' => $this->jobId, 'status' => 500, 'error' => 'Request failed', 'time' => now()]);
             }
+
+            Artisan::call('queue:clear');
+            $this->batch_id->update([
+                'status' => '2',
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
         }
     }
 }

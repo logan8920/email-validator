@@ -47,7 +47,12 @@ class ExcelBulkUploadController extends Controller
             $fileName = $request->file('excel')->getClientOriginalName();
             $data = Excel::toArray(new EmailUploadExcel, $request->file('excel'));
             $heading = array_shift($data[0]);
-            $batchId = batch_process_id::create([]);
+            $batchId = batch_process_id::create([
+                'file_name' => $fileName,
+                'job_completed' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => NULL
+            ]);
 
 
             // Prepare the emails for insertion
@@ -73,19 +78,23 @@ class ExcelBulkUploadController extends Controller
             }
 
             // Dispatch the job to validate emails
-            $chunks = array_chunk($emails['emails'], 300);
+            $chunks = array_chunk($emails['emails'], 50);
+
+            $batchId->update([
+                'total_jobs' => count($chunks)
+            ]);
             foreach ($chunks as $chunk) {
                 EmailBatchValidator::dispatch(['batch_id' => $batchId,'emails' => $chunk]);
                 //Artisan::call('email:process-batch', ['batch_id' => $batchId,'emails' => $chunk]);
             }
 
 
-            /*// Return response to the user immediately
-            return redirect()->back()->with('success','Data Imported Successfully and Job is running in the background!');*/
-            return response()->json([
+            // Return response to the user immediately
+            return redirect()->back()->with('success','Data Imported Successfully and Job is running in the background!');
+            /*return response()->json([
                 'success' => $fileName . ' Data Imported Successfully and Job is running in the background!',
                 'reloadReq' => false
-            ], 200);
+            ], 200);*/
         } catch (\Exception $e) {
             return response()->json([
                 'error' => $e->getMessage()
@@ -97,5 +106,26 @@ class ExcelBulkUploadController extends Controller
     public function downloadBatch(batch_process_id $batch)
     {
         return Excel::download(new BatchResponses($batch), 'batch'.$batch->id.'.'.(rand(1111,99999)).'.xlsx');
+    }
+
+
+    public function updateProgress(batch_process_id $batch)
+    {
+        try {
+           $width = round(($batch->job_completed / $batch->total_jobs) * 100). '%';
+           $status = $batch->status == '1' ? 'Completed' : 'Pending';
+           $file_name = $batch->file_name;
+           $success = true;
+           return response()->json(compact(
+            'width',
+            'status',
+            'file_name',
+            'success'
+           ),200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ],200);  
+        }
     }
 }

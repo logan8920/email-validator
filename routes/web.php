@@ -18,4 +18,5 @@ Route::get('/', [ExcelBulkUploadController::class,'index'])->name('index');
 
 Route::post('/upload',[ExcelBulkUploadController::class,'handleUpload'])->name('upload');
 Route::get('/check',[ExcelBulkUploadController::class,'check'])->name('check');	
-Route::get('/download-batch/{batch}',[ExcelBulkUploadController::class,'downloadBatch'])->name('download.batch');	
+Route::get('/download-batch/{batch}',[ExcelBulkUploadController::class,'downloadBatch'])->name('download.batch');
+Route::get('/update-progress/{batch}',[ExcelBulkUploadController::class,'updateProgress'])->name('update.progress');	

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title></title>
-</head>
-<body>
+    <title>File Upload and Batch Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v6.4.0/css/all.css">
     <style type="text/css">
         @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400&display=swap');
 
@@ -14,6 +15,7 @@
         body {
           background-color: #222;
           color: #fff;
+          margin: 20px;
         }
 
         #drop-area {
@@ -29,6 +31,7 @@
           flex-direction: column;
           gap: 10px;
           cursor: pointer;
+          margin-bottom: 20px;
         }
 
         .drop-text {
@@ -36,115 +39,89 @@
           color: #888;
         }
 
-        #dropped-content {
-          width: calc(100% - 23px);
-          height: 200px;
-          min-height: 69px;
-          max-height: 312px;
-          margin-top: 20px;
-          font-size: 16px;
-          padding: 10px;
-          border: 1px solid #555;
-          resize: vertical;
-          background-color: #444;
-          color: #fff;
-          outline: none;
-          border-radius: 8px;
-        }
-
-        #dropped-content::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        #dropped-content::-webkit-scrollbar-track {
-          background-color: #444;
-        }
-
-        #dropped-content::-webkit-scrollbar-thumb {
-          background-color: #888;
-          border-radius: 4px;
-        }
-
-        #dropped-content::-webkit-scrollbar-thumb:hover {
-          background-color: #aaa;
-        }
-
         .drop-icon i {
           color: #888;
           font-size: 4.5rem;
         }
 
-        #chars {
-          color: #888;
-          float: right;
+        .highlight {
+          background-color: #444 !important;
+          border-color: #007bff !important;
         }
 
-        #spellcheck {
-          display: flex;
-          align-items: center;
-          gap: 5px;
-        }
-
-        #outer-dot {
-          background-color: #007bff;
-          width: 3rem;
-          height: 1.5rem;
-          border-radius: 100px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          transition: background 200ms;
-        }
-
-        #dot {
-          background-color: #eee;
-          width: 1rem;
-          height: 1rem;
-          border-radius: 50%;
-          margin: 0 5px;
-          transform: translateX(22px);
-          transition: transform 200ms;
+        .custom-file-label::after {
+          content: 'Browse';
         }
     </style>
-    <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v6.4.0/css/all.css">
-    <form method="POST" action="/upload" enctype="multipart/form-data">
-      @csrf
-      <input type="file" name="excel" id="excel">
-         
-      <button type="submit">Submit</button>
-    </form>
-    @if(session('success'))
-    <h2 style="color: white">{{session('success')}}</h2>
-    @endif
-    <table width="100%" border="1" cellpadding="1" cellspacing="1">
-      <thead>
-        <tr>
-          <th>Sno.</th>
-          <th>id</th>
-          <th>Start</th>
-          <th>End</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        @foreach($batch_ids as $key => $batch)
-        <tr>
-          <td>{{$key + 1}}</td>
-          <td>{{$batch->id}}</td>
-          <td></td>
-          <td></td>
-          <td>---</td>
-          <td><a href="{{route('download.batch',$batch->id)}}" download>Download</a></td>
+</head>
+<body>
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10 col-sm-12">
+                <div id="drop-area" class="mb-3">
+                    <div class="drop-icon">
+                        <i class="fa-light fa-file-upload"></i>
+                    </div>
+                    <div class="drop-text">Drag and drop files here or click to upload</div>
+                </div>
 
-        </tr>
-        @endforeach
-      </tbody>
-    </table>
+                <form method="POST" action="/upload" enctype="multipart/form-data" class="mb-3">
+                    @csrf
+                    <div class="custom-file mb-3">
+                        <input type="file" class="custom-file-input" id="excel" name="excel">
+                        <label class="custom-file-label" for="excel">Choose file</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Submit</button>
+                </form>
+
+                @if(session('success'))
+                    <div class="alert alert-success" role="alert">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                <div class="table-responsive">
+                  <div class="progress mb-3 d-none">
+                    <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                  </div>
+                    <table class="table table-dark table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">Sno.</th>
+                                <th scope="col">File Name</th>
+                                <th scope="col">Start</th>
+                                <th scope="col">End</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach($batch_ids as $key => $batch)
+                                <tr progress="{{($batch->status == 0) ? 'true' : 'false'}}" progress-id="{{$batch->id}}">
+                                    <th scope="row">{{ $key + 1 }}</th>
+                                    <td>{{ $batch->file_name }}</td>
+                                    <td>{{ $batch->created_at }}</td>
+                                    <td>{{ $batch->updated_at }}</td>
+                                    <td>{{ $batch->status == '0' ? 'pending' : ($batch->status == '1' ? 'Completed' : 'Failed') }}</td>
+                                    <td><a href="{{ route('download.batch', $batch->id) }}" class="btn btn-success btn-sm" download>Download</a></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
     <script type="text/javascript">
         const dropArea = document.getElementById('drop-area');
-        const droppedContent = document.getElementById('dropped-content');
+        const fileInput = document.getElementById('excel');
+        const fileLabel = document.querySelector('.custom-file-label');
 
         dropArea.addEventListener('dragenter', preventDefaults, false);
         dropArea.addEventListener('dragover', preventDefaults, false);
@@ -155,7 +132,9 @@
         dropArea.addEventListener('dragover', highlight, false);
         dropArea.addEventListener('dragleave', unhighlight, false);
         dropArea.addEventListener('drop', unhighlight, false);
-        dropArea.addEventListener('click', openFileDialog, false);
+        dropArea.addEventListener('click', () => fileInput.click(), false);
+
+        fileInput.addEventListener('change', handleFileSelect, false);
 
         function preventDefaults(event) {
           event.preventDefault();
@@ -164,22 +143,10 @@
 
         function highlight() {
           dropArea.classList.add('highlight');
-          dropArea.innerHTML = `
-          <div class="drop-icon">
-            <i class="fa-light fa-file-upload"></i>
-          </div>
-          <div class="drop-text">Drop files</div>
-          `; // Add this line
         }
 
         function unhighlight() {
           dropArea.classList.remove('highlight');
-          dropArea.innerHTML = `
-          <div class="drop-icon">
-            <i class="fa-light fa-file-upload"></i>
-          </div>
-          <div class="drop-text">Drag and drop files here</div>
-          `;
         }
 
         function handleDragLeave(event) {
@@ -190,62 +157,61 @@
         }
 
         function handleDrop(event) {
-          event.preventDefault();
-          const file = event.dataTransfer.files[0];
-          const reader = new FileReader();
+          const dt = event.dataTransfer;
+          const files = dt.files;
 
-          reader.readAsText(file);
-          reader.onload = function () {
-            droppedContent.value = reader.result;
-          };
+          fileInput.files = files;
+          updateFileName(files[0].name);
 
           unhighlight();
         }
 
-        function openFileDialog(event) {
-          const fileInput = document.createElement('input');
-          fileInput.type = 'file';
-          fileInput.accept = 'text/plain';
-
-          fileInput.addEventListener('change', handleFileSelect, false);
-
-          fileInput.click();
-        }
-
         function handleFileSelect(event) {
           const file = event.target.files[0];
-          const reader = new FileReader();
-
-          reader.readAsText(file);
-          reader.onload = function() {
-            droppedContent.value = reader.result;
-          };
+          updateFileName(file.name);
         }
 
-        const chars = document.getElementById('chars');
-
-        droppedContent.addEventListener('input', () => {
-          chars.innerHTML = `${droppedContent.value.length}/5000`;
-        });
-
-        const outerDot = document.getElementById('outer-dot');
-        const dot = document.getElementById('dot');
-        let isSpellcheck = true;
-
-        outerDot.addEventListener('click', () => {
-          isSpellcheck = !isSpellcheck;
-          droppedContent.focus();
-          
-          if (!isSpellcheck) {
-            dot.style.transform = 'none';
-            outerDot.style.backgroundColor = '#444';
-            droppedContent.spellcheck = false;
-          } else {
-            dot.removeAttribute('style');
-            outerDot.removeAttribute('style');
-            droppedContent.spellcheck = true;
-          }
-        });
+        function updateFileName(name) {
+          fileLabel.textContent = name;
+        }
     </script>
+  <script type="text/javascript">
+  let intervalId = {};
+
+  $(document).ready(function() {
+    $('[progress="true"]').each(function() {
+      intervalId[`${this.getAttribute('progress-id')}_process`] = setInterval(() => updateProgressBar(this.getAttribute('progress-id'), this), 2000);
+    });
+  });
+
+  function updateProgressBar(id, tr) {
+
+    const progressBarContainer = $('.progress-bar').parent();
+    progressBarContainer.removeClass('d-none');
+    const progressBar = $('.progress-bar');
+    // console.log(progressBar)
+    fetch(`/update-progress/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+        if (data.success) {
+          progressBar.css('width', data.width).text(`${data.width}`);
+          console.log(progressBar);
+          tr.querySelector('td:nth-child(5)').textContent = data.status;
+          
+          if (data.status === 'Completed') {
+            clearInterval(intervalId[`${id}_process`]);
+          }
+        } else if (data.error) {
+          alert('Please reload the page. Error: ' + data.error);
+        }
+      })
+      .catch(error => {
+        alert('Please reload the page. Error: ' + error);
+      });
+  }
+</script>
+
+
 </body>
 </html>

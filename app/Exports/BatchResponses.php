@@ -29,7 +29,7 @@ class BatchResponses implements FromArray
 
     	for ($i=0; $i < count($email); $i++) { 
     		$data[] = array_map(function($value) {
-    			return $value;
+    			return ($value === 1 || $value === 0 || $value === '') ? ($value ? 'True' : 'False') : $value;
     		}, $email[$i]);
 
     	}

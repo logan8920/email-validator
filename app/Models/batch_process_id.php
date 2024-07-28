@@ -10,8 +10,11 @@ class batch_process_id extends Model
     use HasFactory;
     protected $fillable = [
 
-    	'job_ids',
-    	'created_at',
-    	'updated_at'
+    	'file_name',
+		'total_jobs',
+		'job_completed',
+		'status',
+		'created_at',
+		'updated_at',
     ];
 }
