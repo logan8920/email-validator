@@ -19,11 +19,11 @@ return new class extends Migration
             $table->string('user',36)->nullable();
             $table->string('time',36)->nullable();
             $table->string('domain',96)->nullable();
-            $table->boolean('disposable')->nullable();
+            $table->string('disposable')->nullable();
             $table->string('role',36)->nullable();
-            $table->boolean('free_email')->nullable();
-            $table->boolean('valid_format')->nullable();
-            $table->string('reason',256)->nullable();
+            $table->string('free_email')->nullable();
+            $table->string('valid_format')->nullable();
+            $table->text('reason')->nullable();
             $table->text('mx_domain')->nullable();
             $table->text('mx_record')->nullable();
             $table->timestamps();

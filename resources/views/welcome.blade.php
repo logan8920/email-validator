@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://site-assets.fontawesome.com/releases/v6.4.0/css/all.css">
+    <link rel="stylesheet" type="text/css" href="{{asset('css/toastr.min.css')}}">
     <style type="text/css">
         @import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400&display=swap');
 
@@ -53,6 +54,48 @@
           content: 'Browse';
         }
     </style>
+    <style>
+    /* Styles for the loader */
+    .loader {
+      display: none; /* Hidden by default */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Loader animation */
+    .loader::after {
+      content: '';
+      display: block;
+      width: 50px;
+      height: 50px;
+      border: 5px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    /* Loader visible when .loading class is applied to the body */
+    body.loading .loader {
+      display: flex;
+    }
+
+    /* Keyframes for the spinning animation */
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
 </head>
 <body>
     <div class="container my-5">
@@ -65,7 +108,7 @@
                     <div class="drop-text">Drag and drop files here or click to upload</div>
                 </div>
 
-                <form method="POST" action="/upload" enctype="multipart/form-data" class="mb-3">
+                <form method="POST" action="/upload" id="regFormss" enctype="multipart/form-data" class="mb-3">
                     @csrf
                     <div class="custom-file mb-3">
                         <input type="file" class="custom-file-input" id="excel" name="excel">
@@ -114,9 +157,14 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="{{asset('js/jquery-3.7.1.min.js')}}"></script>
+    <script src="{{asset('js/jquery.validate.min.js')}}"></script>
+    <script src="{{asset('js/sweetalert2@11.js')}}"></script>
+    <script src="{{asset('js/toastr.min.js')}}"></script>
+    <script src="{{asset('js/form.js')}}"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script type="text/javascript">
         const dropArea = document.getElementById('drop-area');
@@ -179,9 +227,9 @@
   let intervalId = {};
 
   $(document).ready(function() {
-    $('[progress="true"]').each(function() {
+    /*$('[progress="true"]').each(function() {
       intervalId[`${this.getAttribute('progress-id')}_process`] = setInterval(() => updateProgressBar(this.getAttribute('progress-id'), this), 2000);
-    });
+    });*/
   });
 
   function updateProgressBar(id, tr) {

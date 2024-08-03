@@ -39,12 +39,14 @@ class EmailBatchValidator implements ShouldQueue
     {
 
         Log::info('Job started', ['jobId' => $this->jobId, 'time' => now(),'email' => count($this->data['emails'])]);
-        $batch_process = batch_process_id::whereId($this->batch_id->id)->first();
+        $batch_process = batch_process_id::whereId($this->batch_id)->first();
         /* $jobids = $batch_process->job_ids ? json_decode($batch_process->job_ids) : [];
         $jobids[] = $this->jobId;
         $batch_process->update(['job_ids'=>json_encode($jobids)]);*/
         $client = new Client();
         $url = 'http://38.242.135.82:5000/check-emails';
+        //$url = 'http://192.168.10.175:5000/check-emails';
+
         // dd($this->data);
         try {
             $response = $client->post($url, [
@@ -62,7 +64,7 @@ class EmailBatchValidator implements ShouldQueue
             }
 
             foreach ($body['data'] as $key => &$value) {
-                $value['batch_id'] = $this->batch_id->id;
+                $value['batch_id'] = $this->batch_id;
                 $value['created_at'] = now();
                 $value['updated_at'] = now();
             }
