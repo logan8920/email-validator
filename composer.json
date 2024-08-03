@@ -15,6 +15,7 @@
         "maatwebsite/excel": "^3.1",
         "mailboxvalidator/mailboxvalidator-php": "^2.1",
         "mattketmo/email-checker": "^2.3",
+        "phpmailer/phpmailer": "^6.9",
         "symfony/process": "^6.4"
     },
     "require-dev": {
