@@ -7,7 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Models\{EmailResponse,batch_process_id};
+use App\Models\{EmailResponse,RetryInvalidEmails as RetryInvalidEmailModals};
 use Illuminate\Support\Facades\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -15,14 +15,18 @@ use Ramsey\Uuid\Uuid;
 use Illuminate\Support\Facades\Artisan;
 use DB;
 
-class EmailBatchValidator implements ShouldQueue 
+class RetryInvalidEmails implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Create a new job instance.
+     */
     public $data;
     public $jobId;
     public $batch_id;
     public $url;
+    public $batch_proccess_id;
 
     /**
      * Create a new job instance.
@@ -33,6 +37,7 @@ class EmailBatchValidator implements ShouldQueue
         $this->batch_id = $data['batch_id'];
         $this->jobId = Uuid::uuid4()->toString();  // Generate a unique ID for this job
         $this->url = $data['url'];
+        $this->batch_proccess_id = $data['batch_proccess_id'];
     }
 
     /**
@@ -41,8 +46,8 @@ class EmailBatchValidator implements ShouldQueue
     public function handle(): void
     {
 
-        Log::info('Job started', ['jobId' => $this->jobId, 'time' => now(),'email' => count($this->data['emails'])]);
-        $batch_process = batch_process_id::whereId($this->batch_id)->first();
+        Log::info('Job started', ['RjobId' => $this->jobId, 'time' => now(),'email' => count($this->data['emails'])]);
+        $batch_process = RetryInvalidEmailModals::whereId($this->batch_id)->first();
         /* $jobids = $batch_process->job_ids ? json_decode($batch_process->job_ids) : [];
         $jobids[] = $this->jobId;
         $batch_process->update(['job_ids'=>json_encode($jobids)]);*/
@@ -67,17 +72,31 @@ class EmailBatchValidator implements ShouldQueue
             }
 
             foreach ($body['data'] as $key => &$value) {
-                $value['batch_id'] = $this->batch_id;
-                $value['created_at'] = now();
+                $value['batch_id'] = $this->batch_proccess_id;
+                //$value['created_at'] = now();
                 $value['updated_at'] = now();
+                $res = EmailResponse::where(['email' => $value['email'], 'batch_id' => $this->batch_proccess_id])->first();
+
+                if ($res) {
+                    // If the record exists, increment the retry count and update the record
+                    $res->increment('retry');
+                    $res->update($value);
+                // echo "string";
+                // print_r($res->toArray());
+                } else {
+                    // If the record doesn't exist, you might want to insert it or handle this case appropriately
+                    Log::warning('EmailResponse record not found', ['email' => $value['email'], 'batch_id' => $this->batch_id]);
+                    // You could insert a new record if that's appropriate
+                    //EmailResponse::create($value);
+                }
             }
+
             //dd($body['data']);
-            EmailResponse::insert($body['data']);
-            Log::info('Job completed successfully', ['jobId' => $this->jobId, 'time' => now()]);
+            Log::info('Job completed successfully', ['RjobId' => $this->jobId, 'time' => now()]);
 
             $batch_process->increment('job_completed');
             $batch_process->update(['updated_at' => NULL]);
-            $batch_process = batch_process_id::whereId($this->batch_id)->first();
+            $batch_process = RetryInvalidEmailModals::whereId($this->batch_id)->first();
             //print_r($batch_process);
            // dd([$batch_process->total_jobs,$batch_process->job_completed]);
             echo "batch_process->total_jobs = ".$batch_process->total_jobs.' | '.'batch_process->job_completed'.$batch_process->job_completed;
@@ -85,7 +104,7 @@ class EmailBatchValidator implements ShouldQueue
                 //dd('inside');
                 echo "inside";
 
-                DB::table('batch_process_ids')->where('id',$batch_process->id)->update(['status'=>'1','updated_at' => now()]);
+                DB::table('table_retry_batch_proccess_id')->where('id',$batch_process->id)->update(['status'=>'1','updated_at' => now()]);
                 /*$batch_process->update([
                     'status' => '1'
                 ]);*/
@@ -93,9 +112,9 @@ class EmailBatchValidator implements ShouldQueue
         } catch (RequestException $e) {
             if ($e->hasResponse()) {
                 $error = $e->getResponse()->getBody()->getContents();
-                Log::error('Job failed', ['jobId' => $this->jobId, 'status' => $e->getResponse()->getStatusCode(), 'error' => $error, 'time' => now()]);
+                Log::error('Job failed', ['RjobId' => $this->jobId, 'status' => $e->getResponse()->getStatusCode(), 'error' => $error, 'time' => now()]);
             } else {
-                Log::error('Job failed', ['jobId' => $this->jobId, 'status' => 500, 'error' => 'Request failed', 'time' => now()]);
+                Log::error('Job failed', ['RjobId' => $this->jobId, 'status' => 500, 'error' => 'Request failed', 'time' => now()]);
             }
 
             //Artisan::call('queue:clear');
