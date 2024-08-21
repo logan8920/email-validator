@@ -22,6 +22,12 @@ Route::get('/check',[ExcelBulkUploadController::class,'check'])->name('check');
 Route::get('/download-batch/{batch}',[ExcelBulkUploadController::class,'downloadBatch'])->name('download.batch');
 Route::get('/update-progress/{batch}',[ExcelBulkUploadController::class,'updateProgress'])->name('update.progress');
 
+Route::get('/update-status/{batch}',[ExcelBulkUploadController::class,'updateStatus'])->name('update.status');
+
+Route::get('/update-invalid-status/{batch}',[ExcelBulkUploadController::class,'updateRetryProgress'])->name('update.invalid.status');
+
+Route::get('/retry-invalid-email/{batch}',[ExcelBulkUploadController::class,'retryInvlaidEmail'])->name('retry.invalid.email');
+
 Route::post('/fetch-job-id',[ExcelBulkUploadController::class, 'fetch_job_id'])->name('fetch.job.id');	
 
 Route::prefix('/cmd')->group(function() {
@@ -30,6 +36,23 @@ Route::prefix('/cmd')->group(function() {
 		Artisan::call("queue:clear");
 		echo "success";
 	});
+
+	Route::get('cache-clear', function() {
+		Artisan::call("cache:clear");
+		echo "success";
+	});
+
+	Route::get('cache-destroy', function() {
+		Artisan::call("cache:clear");
+		Artisan::call("route:clear");
+		Artisan::call("view:clear");
+		Artisan::call("config:clear");
+		Artisan::call("cache:clear");
+		Artisan::call("config:cache");
+		Artisan::call("queue:restart");
+		echo "success";
+	});
+
 
 	Route::get('optimize', function() {
 		Artisan::call("optimize");

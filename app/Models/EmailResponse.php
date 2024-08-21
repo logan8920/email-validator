@@ -22,6 +22,7 @@ class EmailResponse extends Model
 'reason',
 'mx_domain',
 'mx_record',
+'retry',
 'created_at',
 'updated_at',
 

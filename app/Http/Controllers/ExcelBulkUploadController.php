@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Artisan;
 use App\Imports\EmailUploadExcel;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Models\{Email,batch_process_id,EmailResponse};
+use App\Models\{Email,batch_process_id,EmailResponse,RetryInvalidEmails};
 use App\Jobs\{EmailBatchValidator,MultiCurlsHandler,CoreEamilValidate};
 use DB;
+use App\Jobs\RetryInvalidEmails as RetryInvalidEmail;
 use Illuminate\Support\Facades\Log;
 use App\Exports\BatchResponses;
 
@@ -25,7 +26,7 @@ class ExcelBulkUploadController extends Controller
     /**
      * Function to get Excel Data in Array
      */
-    public function handleUploads(Request $request)
+    public function handleUpload(Request $request)
     {
         set_time_limit(0);
         // Validate the uploaded file
@@ -72,9 +73,9 @@ class ExcelBulkUploadController extends Controller
             // Prepare the emails for validation
             $emails['emails'] = [];
             foreach ($data[0] as $value) {
-                if (!in_array($value[0], $emails['emails'])) {
+                //if (!in_array($value[0], $emails['emails'])) {
                     $emails['emails'][] = $value[0];
-                }
+                //}
             }
 
             // Dispatch the job to validate emails
@@ -83,9 +84,14 @@ class ExcelBulkUploadController extends Controller
             $batchId->update([
                 'total_jobs' => count($chunks)
             ]);
-            foreach ($chunks as $chunk) {
+            $loop_count = 5000;
+            foreach ($chunks as $index => $chunk) {
                 //dispatch(new MultiCurlsHandler(['batch_id' => $batchId->id, 'emails' => $chunk]));
-                dispatch(new EmailBatchValidator(['batch_id' => $batchId->id, 'emails' => $chunk]));
+                dispatch(new EmailBatchValidator(['batch_id' => $batchId->id, 'emails' => $chunk,'url' => 'http://51.222.85.206:'.(++$loop_count).'/check-emails']));
+
+                if ($loop_count  >= 5025) {
+                    $loop_count = 5000;
+                }
                 //EmailBatchValidator::dispatch(['batch_id' => $batchId,'emails' => $chunk]);
                 //Artisan::call('email:process-batch', ['batch_id' => $batchId,'emails' => $chunk]);
             }
@@ -119,12 +125,31 @@ class ExcelBulkUploadController extends Controller
            $status = $batch->status == '1' ? 'Completed' : 'Pending';
            $file_name = $batch->file_name;
            $success = true;
+           $total_jobs = $batch->total_jobs;
+           $job_completed = $batch->job_completed;
            return response()->json(compact(
             'width',
             'status',
             'file_name',
-            'success'
+            'success',
+            'total_jobs',
+            'job_completed'
            ),200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ],200);  
+        }
+    }
+
+    public function updateStatus(batch_process_id $batch)
+    {
+        try {
+           $batch->update(['status'=>1]);
+           return response()->json([
+            'success' => true,
+            'updated_at' => date('Y-m-d H:i:s',strtotime($batch->updated_at))
+           ],200);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => $e->getMessage()
@@ -282,7 +307,7 @@ class ExcelBulkUploadController extends Controller
     /**
      * Function to get Excel Data in Array
      */
-    public function handleUpload(Request $request)
+    public function handleUploadssss(Request $request)
     {
         //set_time_limit(0);
         // Validate the uploaded file
@@ -441,6 +466,108 @@ class ExcelBulkUploadController extends Controller
             return response()->json([
                 'error' => $e->getMessage()
             ], 200);
+        }
+    }
+
+
+    public function retryInvlaidEmail(batch_process_id $batch)
+    {
+        set_time_limit(0);
+        
+        try {
+            // Process the uploaded file
+            $data = $batch->email_response()->select('email')->where('status','invalid')->pluck('email')->toArray();
+            // dd($database);
+            //$data = Excel::toArray(new EmailUploadExcel, $request->file('excel'));
+            //$heading = array_shift($data[0]);
+            $batchId = RetryInvalidEmails::create([
+                'batch_proccess_id' => $batch->id,
+                'file_name' => $batch->file_name,
+                'job_completed' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => NULL
+            ]);
+
+
+            // Prepare the emails for insertion
+            /*$insertedEmails = [];
+            foreach ($data[0] as $value) {
+                $insertedEmails[] = [
+                    'email' => $value[0],
+                    'created_at' => now()
+                ];
+            }*/
+
+            // Insert emails into the database
+            // DB::beginTransaction();
+            // Email::insert($insertedEmails);
+            // DB::commit();
+
+            // Prepare the emails for validation
+            $emails['emails'] = [];
+            foreach ($data as $value) {
+                //if (!in_array($value, $emails['emails'])) {
+                    $emails['emails'][] = $value;
+                //}
+            }
+
+            // Dispatch the job to validate emails
+            $chunks = array_chunk($emails['emails'], 20);
+
+            $batchId->update([
+                'total_jobs' => count($chunks)
+            ]);
+            $loop_count = 5000;
+            foreach ($chunks as $index => $chunk) {
+                //dispatch(new MultiCurlsHandler(['batch_id' => $batchId->id, 'emails' => $chunk]));
+                dispatch(new RetryInvalidEmail(['batch_id' => $batchId->id, 'emails' => $chunk,'url' => 'http://51.222.85.206:'.(++$loop_count).'/check-emails','batch_proccess_id' => $batch->id]));
+
+                if ($loop_count  >= 5025) {
+                    $loop_count = 5000;
+                }
+                //EmailBatchValidator::dispatch(['batch_id' => $batchId,'emails' => $chunk]);
+                //Artisan::call('email:process-batch', ['batch_id' => $batchId,'emails' => $chunk]);
+            }
+
+
+            // Return response to the user immediately
+            return response()->json([
+                'success' => true,
+                'id' => $batchId->id
+            ], 200);
+            /*return response()->json([
+                'success' => $fileName . ' Data Imported Successfully and Job is running in the background!',
+                'reloadReq' => false
+            ], 200);*/
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 200);
+        }
+    }
+
+    public function updateRetryProgress(RetryInvalidEmails $batch)
+    {
+        try {
+           $widths = round(($batch->job_completed / $batch->total_jobs) * 100);
+           $width = ($widths ? $widths : 1).'%';
+           $status = $batch->status == '1' ? 'Completed' : 'Pending';
+           $file_name = $batch->file_name;
+           $success = true;
+           $total_jobs = $batch->total_jobs;
+           $job_completed = $batch->job_completed;
+           return response()->json(compact(
+            'width',
+            'status',
+            'file_name',
+            'success',
+            'total_jobs',
+            'job_completed'
+           ),200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ],200);  
         }
     }
 }

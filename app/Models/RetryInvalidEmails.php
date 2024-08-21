@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class batch_process_id extends Model
+class RetryInvalidEmails extends Model
 {
     use HasFactory;
+    protected $table = 'table_retry_batch_proccess_id';
     protected $fillable = [
-
+    	'batch_proccess_id',
     	'file_name',
 		'total_jobs',
 		'job_completed',
@@ -17,14 +18,4 @@ class batch_process_id extends Model
 		'created_at',
 		'updated_at',
     ];
-
-    public function email_response()
-    {
-    	return $this->hasMany(EmailResponse::class,"batch_id",'id');
-    }
-
-    public function retry_batch()
-    {
-    	return $this->hasOne(RetryInvalidEmails::class,"batch_proccess_id",'id');
-    }
 }

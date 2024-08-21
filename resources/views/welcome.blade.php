@@ -124,9 +124,7 @@
                 @endif
 
                 <div class="table-responsive">
-                  <div class="progress mb-3 d-none">
-                    <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                  </div>
+                  
                     <table class="table table-dark table-striped">
                         <thead>
                             <tr>
@@ -141,13 +139,13 @@
 
                         <tbody>
                             @foreach($batch_ids as $key => $batch)
-                                <tr progress="{{($batch->status == 0) ? 'true' : 'false'}}" progress-id="{{$batch->id}}">
+                                <tr progress="{{($batch->status == 0) ? 'true' : 'false'}}" progress-id="{{$batch->id}}" retrying="{{($batch->retry_batch?->status === '0') ? 'true' : 'false'}}" retry-id="{{$batch?->retry_batch?->id}}">
                                     <th scope="row">{{ $key + 1 }}</th>
                                     <td>{{ $batch->file_name }}</td>
                                     <td>{{ $batch->created_at }}</td>
                                     <td>{{ $batch->updated_at }}</td>
                                     <td>{{ $batch->status == '0' ? 'pending' : ($batch->status == '1' ? 'Completed' : 'Failed') }}</td>
-                                    <td><a href="{{ route('download.batch', $batch->id) }}" class="btn btn-success btn-sm" download>Download</a></td>
+                                    <td class="align-content-center"><a href="{{ route('download.batch', $batch->id) }}" class="btn btn-success btn-sm">Download</a></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -227,16 +225,42 @@
   let intervalId = {};
 
   $(document).ready(function() {
-    /*$('[progress="true"]').each(function() {
-      intervalId[`${this.getAttribute('progress-id')}_process`] = setInterval(() => updateProgressBar(this.getAttribute('progress-id'), this), 2000);
-    });*/
+    $('[progress="true"]').each(function() {
+      const progressBarHtml = $(`<div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                              </div>`);
+      $('td:nth-child(6)',this).html('').append(progressBarHtml);
+
+      intervalId[`${this.getAttribute('progress-id')}_process`] = setInterval(() => { 
+        //const progressBarContainer = $(this).append(progressBarHtml);
+        updateProgressBar(this.getAttribute('progress-id'), this, progressBarHtml) 
+
+    }, 2000);
+    });
+
+    $('[retryings="true"]').each(function() {
+      const progressBarHtml = $(`<div><div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                              </div><span>Rechecking Invalid Emails</span></div>`);
+      if (this.getAttribute('retry-id')) {
+        $('td:nth-child(6)', this).html('').append(progressBarHtml);
+
+        intervalId[`${this.getAttribute('retry-id')}_process`] = setInterval(() => { 
+            //const progressBarContainer = $(this).append(progressBarHtml);
+            //retryingInvalidEmails(this.getAttribute('retry-id'), this); 
+            updateRetryProgressBar(this.getAttribute('retry-id'), this, progressBarHtml,this.getAttribute('progress-id'));
+
+        }, 2000);
+      }
+    });
   });
 
-  function updateProgressBar(id, tr) {
-
-    const progressBarContainer = $('.progress-bar').parent();
-    progressBarContainer.removeClass('d-none');
-    const progressBar = $('.progress-bar');
+  function updateProgressBar(id, tr, pb) {
+    /*const progressBarHtml = $(`<div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                              </div>`);*/
+    const dBtn = `<a href="/download-batch/${id}" class="btn btn-success btn-sm" >Download</a>`;
+    const progressBar = pb.find('.progress-bar');
     // console.log(progressBar)
     fetch(`/update-progress/${id}`)
       .then(res => res.json())
@@ -246,9 +270,86 @@
           progressBar.css('width', data.width).text(`${data.width}`);
           console.log(progressBar);
           tr.querySelector('td:nth-child(5)').textContent = data.status;
+          tr.querySelector('td:nth-child(4)').textContent = '';
           
-          if (data.status === 'Completed') {
+          if (data.status === 'Completed' || data.width === "100%" || data.total_jobs == data.job_completed) {
             clearInterval(intervalId[`${id}_process`]);
+            fetch(`/update-status/${id}`)
+            .then(ress => ress.json())
+            .then(datas => {
+              if(datas.success){
+                pb.remove();
+                tr.querySelector('td:nth-child(5)').textContent = 'Completed';
+                tr.querySelector('td:nth-child(4)').textContent = datas.updated_at;
+                //retryingInvalidEmails(id,tr);
+                tr.querySelector('td:nth-child(6)').innerHTML = dBtn;
+              }
+            })
+            .catch(error => {
+              alert(error)
+            });
+          }
+        } else if (data.error) {
+          alert('Please reload the page. Error: ' + data.error);
+        }
+      })
+      .catch(error => {
+        alert('Please reload the page. Error: ' + error);
+      });
+  }
+
+
+  async function retryingInvalidEmails(id, tr) {
+    const progressBarHtml = $(`<div><div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                              </div><span>Rechecking Invalid Emails</span></div>`);
+
+    try {
+      const res = await fetch(`/retry-invalid-email/${id}`);
+      const data = await res.json();
+      
+      $('td:nth-child(6)', tr).html('').append(progressBarHtml);
+      
+      if (data.success) {
+        intervalId[`${data.id}_processs`] = setInterval(() => { 
+          updateRetryProgressBar(data.id, tr, progressBarHtml,id);
+        }, 2000);
+      } else {
+        alert('Error');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to fetch retry data. Please try again later.');
+    }
+  }
+
+
+
+  function updateRetryProgressBar(id, tr, pb,bid) {
+    /*const progressBarHtml = $(`<div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                              </div>`);*/
+    const dBtn = `<a href="/download-batch/${bid}" class="btn btn-success btn-sm">Download</a>`;
+    const progressBar = pb.find('.progress-bar');
+    // console.log(progressBar)
+    fetch(`/update-invalid-status/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+        if (data.success) {
+          progressBar.css('width', data.width).text(`${data.width}`);
+          console.log(progressBar);
+          //tr.querySelector('td:nth-child(5)').textContent = data.status;
+          //tr.querySelector('td:nth-child(4)').textContent = '';
+          
+          if (data.status === 'Completed' || data.width === "100%" || data.total_jobs == data.job_completed) {
+            clearInterval(intervalId[`${id}_processs`]);
+           
+            pb.remove();
+                
+            tr.querySelector('td:nth-child(6)').innerHTML = dBtn;
+              
+            
           }
         } else if (data.error) {
           alert('Please reload the page. Error: ' + data.error);
